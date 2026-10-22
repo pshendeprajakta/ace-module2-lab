@@ -21,6 +21,13 @@ function favicon () {
   return utils.extractFilename(config.get('application.favicon'))
 }
 
+function sanitizePugString (str: string): string {
+  return str
+    .replace(/[\r\n]+/g, '')
+    .replace(/(?<!\\)([#!]\{)/g, '\\$1')
+    .replace(/^([^\\])/, '\\$1')
+}
+
 export function getUserProfile () {
   return async (req: Request, res: Response, next: NextFunction) => {
     let template: string
@@ -61,7 +68,7 @@ export function getUserProfile () {
         const singleQuoteRegex = /^'(?:[^'\\]|\\.)*'$/
         const doubleQuoteRegex = /^"(?:[^"\\]|\\.)*"$/
         const backtickRegex = /^`(?:[^`\\$]|\\.|\$(?!{))*`$/
-        const numericRegex = /^-?\d+(?:\.\d+)?$/
+        const numericRegex = /^[\d\s+\-*/%().]+$/
         const booleanRegex = /^(?:true|false|null|undefined)$/
 
         const isSafe = singleQuoteRegex.test(code) ||
@@ -75,16 +82,19 @@ export function getUserProfile () {
         }
         username = eval(code) // eslint-disable-line no-eval
       } catch (err) {
-        username = '\\' + username
+        username = sanitizePugString(username ?? '')
       }
     } else {
-      username = '\\' + username
+      username = sanitizePugString(username ?? '')
     }
 
     const themeKey = config.get<string>('application.theme') as keyof typeof themes
     const theme = themes[themeKey] || themes['bluegrey-lightgreen']
 
     if (username) {
+      if (typeof username === 'string') {
+        username = sanitizePugString(username)
+      }
       template = template.replace(/_username_/g, username)
     }
     template = template.replace(/_emailHash_/g, security.hash(user?.email))
